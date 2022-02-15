@@ -115,6 +115,9 @@ parking_lot = "0.11"
 raw-window-handle = "0.4"
 serde = { version = "1", features = ["derive"], optional = true }
 smallvec = "1"
+pollster = "0.2.5"
+bytemuck = { version = "1.7.3", features = ["derive"] }
+lazy_static = "1.4.0"
 
 [dev-dependencies]
 bitflags = "1"
