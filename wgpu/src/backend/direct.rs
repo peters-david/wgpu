@@ -1345,7 +1345,9 @@ impl crate::Context for Context {
         desc: &ComputePipelineDescriptor,
     ) -> Self::ComputePipelineId {
         use wgc::pipeline as pipe;
-
+        
+        println!("before");
+        
         let implicit_pipeline_ids = match desc.layout {
             Some(_) => None,
             None => Some(wgc::device::ImplicitPipelineIds {
@@ -1353,6 +1355,9 @@ impl crate::Context for Context {
                 group_ids: &[PhantomData; wgc::MAX_BIND_GROUPS],
             }),
         };
+        
+        println!("implicit pipeline ids");
+        
         let descriptor = pipe::ComputePipelineDescriptor {
             label: desc.label.map(Borrowed),
             layout: desc.layout.map(|l| l.id),
@@ -1361,6 +1366,8 @@ impl crate::Context for Context {
                 entry_point: Borrowed(desc.entry_point),
             },
         };
+        
+        println!("descriptor");
 
         let global = &self.0;
         let (id, error) = wgc::gfx_select!(device.id => global.device_create_compute_pipeline(
@@ -1369,6 +1376,9 @@ impl crate::Context for Context {
             PhantomData,
             implicit_pipeline_ids
         ));
+        
+        println!("global");
+        
         if let Some(cause) = error {
             if let wgc::pipeline::CreateComputePipelineError::Internal(ref error) = cause {
                 log::warn!(
