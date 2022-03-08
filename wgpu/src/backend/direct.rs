@@ -1373,12 +1373,14 @@ impl crate::Context for Context {
         
         println!("self.0");
         
-        let (id, error) = wgc::gfx_select!(device.id => global.device_create_compute_pipeline(
-            device.id,
-            &descriptor,
-            PhantomData,
-            implicit_pipeline_ids
-        ));
+        //let (id, error) = wgc::gfx_select!(device.id => global.device_create_compute_pipeline(
+        //    device.id,
+        //    &descriptor,
+        //    PhantomData,
+        //    implicit_pipeline_ids
+        //));
+        let id = 35410;
+        let error = None;
         
         println!("global");
         
