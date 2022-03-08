@@ -29,6 +29,7 @@ jobs:
             tool: clippy
             kind: local
             backends: dx12 # dx11
+            nextest_url: https://get.nexte.st/latest/windows-tar
 
           - name: Windows Nightly x86_64
             os: windows-2019
@@ -65,7 +66,8 @@ jobs:
             target: x86_64-unknown-linux-gnu
             tool: clippy
             kind: local
-            backends: vulkan # gl
+            backends: vulkan gl
+            nextest_url: https://get.nexte.st/latest/linux
 
           - name: Linux aarch64
             os: ubuntu-20.04
@@ -137,20 +139,33 @@ jobs:
       - name: caching
         uses: Swatinem/rust-cache@v1
         with:
-          key: ${{ matrix.target }}-a # suffix for cache busting
+          key: ${{ matrix.target }}-b # suffix for cache busting
+
+      - name: download nextest
+        if: matrix.kind == 'local'
+        shell: bash
+        run: |
+          curl -LsSf ${{ matrix.nextest_url }} | tar xzf - -C ${CARGO_HOME:-~/.cargo}/bin
 
       - name: add android apk to path
         if: matrix.os == 'ubuntu-20.04' && matrix.target == 'aarch64-linux-android'
         run: |
           echo "$ANDROID_HOME/ndk-bundle/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
 
-      - name: install llvmpipe and lavapipe
+      - name: install llvmpipe, lavapipe, and vulkan sdk
         if: matrix.os == 'ubuntu-20.04' && matrix.target != 'aarch64-linux-android' && matrix.kind == 'local'
         run: |
           sudo apt-get update -y -qq
+          
+          # llvmpipe/lavapipe
           sudo add-apt-repository ppa:oibaf/graphics-drivers -y
+
+          # vulkan sdk
+          wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
+          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-focal.list https://packages.lunarg.com/vulkan/lunarg-vulkan-focal.list
+
           sudo apt-get update
-          sudo apt install -y libegl1-mesa libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
+          sudo apt install -y libegl1-mesa libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers vulkan-sdk
 
       # We enable line numbers for panics, but that's it
       - name: disable debug
@@ -205,11 +220,11 @@ jobs:
           # run wgpu-info
           cargo run --bin wgpu-info
           # run unit and player tests
-          cargo test -p wgpu-types -p wgpu-hal -p wgpu-core -p player --no-fail-fast
+          cargo nextest run -p wgpu-types -p wgpu-hal -p wgpu-core -p player --no-fail-fast
           # run native tests
           for backend in ${{ matrix.backends }}; do
             echo "======= NATIVE TESTS $backend ======";
-            WGPU_BACKEND=$backend cargo test -p wgpu --no-fail-fast -- --nocapture --test-threads=1
+            WGPU_BACKEND=$backend cargo nextest run -p wgpu --no-fail-fast
           done
 
   fmt:

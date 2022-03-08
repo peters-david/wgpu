@@ -134,30 +134,12 @@ impl super::Surface {
     }
 
     pub(super) fn dimensions(&self) -> wgt::Extent3d {
-        let (size, scale): (CGSize, CGFloat) = match self.view {
-            Some(view) if !cfg!(target_os = "macos") => unsafe {
-                let bounds: CGRect = msg_send![view.as_ptr(), bounds];
-                let window: Option<NonNull<Object>> = msg_send![view.as_ptr(), window];
-                let screen = window.and_then(|window| -> Option<NonNull<Object>> {
-                    msg_send![window.as_ptr(), screen]
-                });
-                match screen {
-                    Some(screen) => {
-                        let screen_space: *mut Object = msg_send![screen.as_ptr(), coordinateSpace];
-                        let rect: CGRect = msg_send![view.as_ptr(), convertRect:bounds toCoordinateSpace:screen_space];
-                        let scale_factor: CGFloat = msg_send![screen.as_ptr(), nativeScale];
-                        (rect.size, scale_factor)
-                    }
-                    None => (bounds.size, 1.0),
-                }
-            },
-            _ => unsafe {
-                let render_layer_borrow = self.render_layer.lock();
-                let render_layer = render_layer_borrow.as_ref();
-                let bounds: CGRect = msg_send![render_layer, bounds];
-                let contents_scale: CGFloat = msg_send![render_layer, contentsScale];
-                (bounds.size, contents_scale)
-            },
+        let (size, scale): (CGSize, CGFloat) = unsafe {
+            let render_layer_borrow = self.render_layer.lock();
+            let render_layer = render_layer_borrow.as_ref();
+            let bounds: CGRect = msg_send![render_layer, bounds];
+            let contents_scale: CGFloat = msg_send![render_layer, contentsScale];
+            (bounds.size, contents_scale)
         };
 
         wgt::Extent3d {
@@ -208,10 +190,15 @@ impl crate::Surface<super::Api> for super::Surface {
         render_layer.set_pixel_format(self.raw_swapchain_format);
         render_layer.set_framebuffer_only(framebuffer_only);
         render_layer.set_presents_with_transaction(self.present_with_transaction);
+        // opt-in to Metal EDR
+        // EDR potentially more power used in display and more bandwidth, memory footprint.
+        let wants_edr = self.raw_swapchain_format == mtl::MTLPixelFormat::RGBA16Float;
+        if wants_edr != render_layer.wants_extended_dynamic_range_content() {
+            render_layer.set_wants_extended_dynamic_range_content(wants_edr);
+        }
 
         // this gets ignored on iOS for certain OS/device combinations (iphone5s iOS 10.3)
-        let () = msg_send![*render_layer, setMaximumDrawableCount: config.swap_chain_size as u64];
-
+        render_layer.set_maximum_drawable_count(config.swap_chain_size as _);
         render_layer.set_drawable_size(drawable_size);
         if caps.can_set_next_drawable_timeout {
             let () = msg_send![*render_layer, setAllowsNextDrawableTimeout:false];

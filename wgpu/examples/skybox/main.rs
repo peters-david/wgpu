@@ -4,7 +4,7 @@ mod framework;
 use bytemuck::{Pod, Zeroable};
 use cgmath::SquareMatrix;
 use std::borrow::Cow;
-use wgpu::util::DeviceExt;
+use wgpu::{util::DeviceExt, AstcBlock, AstcChannel};
 
 const IMAGE_SIZE: u32 = 128;
 
@@ -273,7 +273,10 @@ impl framework::Example for Skybox {
         let skybox_format =
             if device_features.contains(wgpu::Features::TEXTURE_COMPRESSION_ASTC_LDR) {
                 log::info!("Using ASTC_LDR");
-                wgpu::TextureFormat::Astc4x4RgbaUnormSrgb
+                wgpu::TextureFormat::Astc {
+                    block: AstcBlock::B4x4,
+                    channel: AstcChannel::UnormSrgb,
+                }
             } else if device_features.contains(wgpu::Features::TEXTURE_COMPRESSION_ETC2) {
                 log::info!("Using ETC2");
                 wgpu::TextureFormat::Etc2Rgb8UnormSrgb
@@ -306,7 +309,10 @@ impl framework::Example for Skybox {
         );
 
         let bytes = match skybox_format {
-            wgpu::TextureFormat::Astc4x4RgbaUnormSrgb => &include_bytes!("images/astc.dds")[..],
+            wgpu::TextureFormat::Astc {
+                block: AstcBlock::B4x4,
+                channel: AstcChannel::UnormSrgb,
+            } => &include_bytes!("images/astc.dds")[..],
             wgpu::TextureFormat::Etc2Rgb8UnormSrgb => &include_bytes!("images/etc2.dds")[..],
             wgpu::TextureFormat::Bc1RgbaUnormSrgb => &include_bytes!("images/bc1.dds")[..],
             wgpu::TextureFormat::Bgra8UnormSrgb => &include_bytes!("images/bgra.dds")[..],
@@ -484,9 +490,9 @@ fn skybox_bc1() {
         width: 1024,
         height: 768,
         optional_features: wgpu::Features::TEXTURE_COMPRESSION_BC,
-        base_test_parameters: framework::test_common::TestParameters::default(),
+        base_test_parameters: framework::test_common::TestParameters::default(), // https://bugs.chromium.org/p/angleproject/issues/detail?id=7056
         tolerance: 5,
-        max_outliers: 10,
+        max_outliers: 105, // Bounded by llvmpipe
     });
 }
 
@@ -497,9 +503,9 @@ fn skybox_etc2() {
         width: 1024,
         height: 768,
         optional_features: wgpu::Features::TEXTURE_COMPRESSION_ETC2,
-        base_test_parameters: framework::test_common::TestParameters::default(),
+        base_test_parameters: framework::test_common::TestParameters::default(), // https://bugs.chromium.org/p/angleproject/issues/detail?id=7056
         tolerance: 5,
-        max_outliers: 100, // Bounded by llvmpipe
+        max_outliers: 105, // Bounded by llvmpipe
     });
 }
 
@@ -510,7 +516,7 @@ fn skybox_astc() {
         width: 1024,
         height: 768,
         optional_features: wgpu::Features::TEXTURE_COMPRESSION_ASTC_LDR,
-        base_test_parameters: framework::test_common::TestParameters::default(),
+        base_test_parameters: framework::test_common::TestParameters::default(), // https://bugs.chromium.org/p/angleproject/issues/detail?id=7056
         tolerance: 5,
         max_outliers: 300, // Bounded by rp4 on vk
     });

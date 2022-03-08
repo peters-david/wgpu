@@ -639,14 +639,29 @@ impl<A: HalApi> Device<A> {
     ) -> Result<resource::Texture<A>, resource::CreateTextureError> {
         let format_desc = desc.format.describe();
 
-        // Depth textures can only be 2D
-        if format_desc.sample_type == wgt::TextureSampleType::Depth
-            && desc.dimension != wgt::TextureDimension::D2
-        {
-            return Err(resource::CreateTextureError::InvalidDepthKind(
-                desc.dimension,
-                desc.format,
-            ));
+        if desc.dimension != wgt::TextureDimension::D2 {
+            // Depth textures can only be 2D
+            if format_desc.sample_type == wgt::TextureSampleType::Depth {
+                return Err(resource::CreateTextureError::InvalidDepthDimension(
+                    desc.dimension,
+                    desc.format,
+                ));
+            }
+            // Renderable textures can only be 2D
+            if desc.usage.contains(wgt::TextureUsages::RENDER_ATTACHMENT) {
+                return Err(resource::CreateTextureError::InvalidDimensionUsages(
+                    wgt::TextureUsages::RENDER_ATTACHMENT,
+                    desc.dimension,
+                ));
+            }
+
+            // Compressed textures can only be 2D
+            if format_desc.is_compressed() {
+                return Err(resource::CreateTextureError::InvalidCompressedDimension(
+                    desc.dimension,
+                    desc.format,
+                ));
+            }
         }
 
         let format_features = self
@@ -659,7 +674,7 @@ impl<A: HalApi> Device<A> {
 
         let missing_allowed_usages = desc.usage - format_features.allowed_usages;
         if !missing_allowed_usages.is_empty() {
-            return Err(resource::CreateTextureError::InvalidUsages(
+            return Err(resource::CreateTextureError::InvalidFormatUsages(
                 missing_allowed_usages,
                 desc.format,
             ));
@@ -2306,7 +2321,7 @@ impl<A: HalApi> Device<A> {
                 .any(|ct| ct.write_mask != first.write_mask || ct.blend != first.blend)
         } {
             log::info!("Color targets: {:?}", color_targets);
-            self.require_downlevel_flags(wgt::DownlevelFlags::INDEPENDENT_BLENDING)?;
+            self.require_downlevel_flags(wgt::DownlevelFlags::INDEPENDENT_BLEND)?;
         }
 
         let mut io = validation::StageIo::default();
@@ -2728,10 +2743,13 @@ impl<A: HalApi> Device<A> {
         let format_desc = format.describe();
         self.require_features(format_desc.required_features)?;
 
-        if self
+        let using_device_features = self
             .features
-            .contains(wgt::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES)
-        {
+            .contains(wgt::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES);
+        // If we're running downlevel, we need to manually ask the backend what we can use as we can't trust WebGPU.
+        let downlevel = !self.downlevel.is_webgpu_compliant();
+
+        if using_device_features || downlevel {
             Ok(adapter.get_texture_format_features(format))
         } else {
             Ok(format_desc.guaranteed_format_features)

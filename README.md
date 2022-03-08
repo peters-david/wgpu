@@ -32,7 +32,7 @@ For an overview of all the components in the gfx-rs ecosystem, see [the big pict
 ### MSRV policy
 
 Minimum Supported Rust Version is **1.53**.
-It is enforced on CI (in "/.github/workflows/ci.txt") with `RUST_VERSION` variable.
+It is enforced on CI (in "/.github/workflows/ci.yml") with `RUST_VERSION` variable.
 This version can only be upgraded in breaking releases.
 
 ## Getting Started
@@ -77,6 +77,21 @@ We have a [wiki](https://github.com/gfx-rs/wgpu/wiki) that serves as a knowledge
 
 :white_check_mark: = First Class Support — :ok: = Best Effort Support — :hammer_and_wrench: = Unsupported, but support in progress
 
+### Shader Support
+
+wgpu supports shaders in [WGSL](https://gpuweb.github.io/gpuweb/wgsl/), SPIR-V, and GLSL. 
+Both [HLSL](https://github.com/Microsoft/DirectXShaderCompiler) and [GLSL](https://github.com/KhronosGroup/glslang) 
+have compilers to target SPIR-V. All of these shader languages can be used with any backend, we
+will handle all of the conversion. Additionally, support for these shader inputs is not going away.
+
+While WebGPU does not support any shading language other than WGSL, we will automatically convert your
+non-WGSL shaders if you're running on WebGPU.
+
+WGSL is always supported by default, but GLSL and SPIR-V need features enabled to compile in support.
+
+To enable SPIR-V shaders, enable the `spirv` feature of wgpu.  
+To enable GLSL shaders, enable the `glsl` feature of wgpu.
+
 ### Angle
 
 [Angle](http://angleproject.org) is a translation layer from GLES to other backends, developed by Google.
@@ -84,7 +99,7 @@ We support running our GLES3 backend over it in order to reach platforms with GL
 In order to run with Angle, "angle" feature has to be enabled, and Angle libraries placed in a location visible to the application.
 These binaries can be downloaded from [gfbuild-angle](https://github.com/DileSoft/gfbuild-angle) artifacts.
 
-On Windows, you generally need to copy them into the working directory, or in the same directory as the executable.
+On Windows, you generally need to copy them into the working directory, in the same directory as the executable, or somewhere in your path.
 On Linux, you can point to them using `LD_LIBRARY_PATH` environment.
 
 ## Environment Variables
@@ -101,40 +116,43 @@ When running the CTS, use the variables `DENO_WEBGPU_ADAPTER_NAME`, `DENO_WEBGPU
 
 We have multiple methods of testing, each of which tests different qualities about wgpu. We automatically run our tests on CI if possible. The current state of CI testing:
 
-| Backend/Platform | Status                                                                 |
-| ---------------- | ---------------------------------------------------------------------- |
-| DX12/Windows 10  | :heavy_check_mark: (over WARP)                                         |
-| DX11/Windows 10  | :construction: (over WARP)                                             |
-| Metal/MacOS      | :x: (no CPU runner)                                                    |
-| Vulkan/Linux     | :ok: ([cts hangs](https://github.com/gfx-rs/wgpu/issues/1974))         |
-| GLES/Linux       | :x: ([egl fails init](https://github.com/gfx-rs/wgpu/issues/1551))     |
+| Backend/Platform | Tests              | CTS                 | Notes                                 |
+| ---------------- | -------------------|---------------------|-------------------------------------- |
+| DX12/Windows 10  | :heavy_check_mark: | :heavy_check_mark:  | using WARP                            |
+| DX11/Windows 10  | :construction:     | —                   | using WARP                            |
+| Metal/MacOS      | —                  | —                   | metal requires GPU                    |
+| Vulkan/Linux     | :heavy_check_mark: | :x:                 | using lavapipe, [cts hangs][cts-hang] |
+| GLES/Linux       | :heavy_check_mark: | —                   | using llvmpipe                        |
+
+[cts-hang]: https://github.com/gfx-rs/wgpu/issues/1974
 
 ### Core Test Infrastructure
 
-All framework based examples have image comparison tested against their screenshot.
+We use a tool called [`cargo nextest`](https://github.com/nextest-rs/nextest) to run our tests.
+To install it, run `cargo install cargo-nextest`.
 
 To run the test suite on the default device:
 
 ```
-cargo test --no-fail-fast
+cargo nextest run --no-fail-fast
 ```
 
-There's logic which can automatically run the tests once for each adapter on your system.
+`wgpu-info` can run the tests once for each adapter on your system.
 
 ```
-cargo run --bin wgpu-info -- cargo test --no-fail-fast
+cargo run --bin wgpu-info -- cargo nextest run --no-fail-fast
 ```
 
 Then to run an example's image comparison tests, run:
 
 ```
-cargo test --example <example-name> --no-fail-fast
+cargo nextest run --example <example-name> --no-fail-fast
 ```
 
 Or run a part of the integration test suite:
 
 ```
-cargo test -p wgpu -- <name-of-test>
+cargo nextest run -p wgpu -- <name-of-test>
 ```
 
 If you are a user and want a way to help contribute to wgpu, we always need more help writing test cases. 

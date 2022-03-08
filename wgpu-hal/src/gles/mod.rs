@@ -135,6 +135,8 @@ bitflags::bitflags! {
         const INDEX_BUFFER_ROLE_CHANGE = 1 << 5;
         /// Indicates that the device supports disabling draw buffers
         const CAN_DISABLE_DRAW_BUFFER = 1 << 6;
+        /// Supports `glGetBufferSubData`
+        const GET_BUFFER_SUB_DATA = 1 << 7;
     }
 }
 
@@ -180,6 +182,7 @@ struct AdapterShared {
     private_caps: PrivateCapabilities,
     workarounds: Workarounds,
     shading_language_version: naga::back::glsl::Version,
+    max_texture_size: u32,
 }
 
 pub struct Adapter {

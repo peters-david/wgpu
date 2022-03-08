@@ -15,6 +15,7 @@ const EGL_PLATFORM_X11_KHR: u32 = 0x31D5;
 const EGL_PLATFORM_ANGLE_ANGLE: u32 = 0x3202;
 const EGL_PLATFORM_ANGLE_NATIVE_PLATFORM_TYPE_ANGLE: u32 = 0x348F;
 const EGL_PLATFORM_ANGLE_DEBUG_LAYERS_ENABLED: u32 = 0x3451;
+const EGL_PLATFORM_SURFACELESS_MESA: u32 = 0x31DD;
 const EGL_GL_COLORSPACE_KHR: u32 = 0x309D;
 const EGL_GL_COLORSPACE_SRGB_KHR: u32 = 0x3089;
 
@@ -168,11 +169,19 @@ fn choose_config(
     let tiers = [
         (
             "off-screen",
-            &[egl::RENDERABLE_TYPE, egl::OPENGL_ES2_BIT][..],
+            &[
+                egl::SURFACE_TYPE,
+                egl::PBUFFER_BIT,
+                egl::RENDERABLE_TYPE,
+                egl::OPENGL_ES2_BIT,
+            ][..],
         ),
-        ("presentation", &[egl::SURFACE_TYPE, egl::WINDOW_BIT]),
+        ("presentation", &[egl::SURFACE_TYPE, egl::WINDOW_BIT][..]),
         #[cfg(not(target_os = "android"))]
-        ("native-render", &[egl::NATIVE_RENDERABLE, egl::TRUE as _]),
+        (
+            "native-render",
+            &[egl::NATIVE_RENDERABLE, egl::TRUE as _][..],
+        ),
     ];
 
     let mut attributes = Vec::with_capacity(9);
@@ -253,17 +262,20 @@ fn gl_debug_message_callback(source: u32, gltype: u32, id: u32, severity: u32, m
         _ => unreachable!(),
     };
 
-    log::log!(
-        log_severity,
-        "GLES: [{}/{}] ID {} : {}",
-        source_str,
-        type_str,
-        id,
-        message
-    );
+    let _ = std::panic::catch_unwind(|| {
+        log::log!(
+            log_severity,
+            "GLES: [{}/{}] ID {} : {}",
+            source_str,
+            type_str,
+            id,
+            message
+        );
+    });
 
     if cfg!(debug_assertions) && log_severity == log::Level::Error {
-        std::process::exit(1);
+        // Set canary and continue
+        crate::VALIDATION_CANARY.set();
     }
 }
 
@@ -666,8 +678,19 @@ impl crate::Instance<super::Api> for Instance {
                 )
                 .unwrap();
             (display, Some(Arc::new(library)), WindowKind::AngleX11)
+        } else if client_ext_str.contains("EGL_MESA_platform_surfaceless") {
+            log::info!("No windowing system present. Using surfaceless platform");
+            let egl = egl1_5.expect("Failed to get EGL 1.5 for surfaceless");
+            let display = egl
+                .get_platform_display(
+                    EGL_PLATFORM_SURFACELESS_MESA,
+                    std::ptr::null_mut(),
+                    &[egl::ATTRIB_NONE],
+                )
+                .unwrap();
+            (display, None, WindowKind::Unknown)
         } else {
-            log::info!("Using default platform");
+            log::info!("EGL_MESA_platform_surfaceless not available. Using default platform");
             let display = egl.get_display(egl::DEFAULT_DISPLAY).unwrap();
             (display, None, WindowKind::Unknown)
         };

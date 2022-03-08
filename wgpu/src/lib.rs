@@ -2,6 +2,7 @@
 //!
 //! To start using the API, create an [`Instance`].
 
+#![cfg_attr(docsrs, feature(doc_cfg))] // Allow doc(cfg(feature = "")) for showing in docs that something is feature gated.
 #![doc(html_logo_url = "https://raw.githubusercontent.com/gfx-rs/wgpu/master/logo.png")]
 #![warn(missing_docs)]
 
@@ -25,13 +26,13 @@ use std::{
 use parking_lot::Mutex;
 
 pub use wgt::{
-    AdapterInfo, AddressMode, Backend, Backends, BindGroupLayoutEntry, BindingType, BlendComponent,
-    BlendFactor, BlendOperation, BlendState, BufferAddress, BufferBindingType, BufferSize,
-    BufferUsages, Color, ColorTargetState, ColorWrites, CommandBufferDescriptor, CompareFunction,
-    DepthBiasState, DepthStencilState, DeviceType, DownlevelCapabilities, DownlevelFlags,
-    DynamicOffset, Extent3d, Face, Features, FilterMode, FrontFace, ImageDataLayout,
-    ImageSubresourceRange, IndexFormat, Limits, MultisampleState, Origin3d,
-    PipelineStatisticsTypes, PolygonMode, PowerPreference, PresentMode, PrimitiveState,
+    AdapterInfo, AddressMode, AstcBlock, AstcChannel, Backend, Backends, BindGroupLayoutEntry,
+    BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState, BufferAddress,
+    BufferBindingType, BufferSize, BufferUsages, Color, ColorTargetState, ColorWrites,
+    CommandBufferDescriptor, CompareFunction, DepthBiasState, DepthStencilState, DeviceType,
+    DownlevelCapabilities, DownlevelFlags, DynamicOffset, Extent3d, Face, Features, FilterMode,
+    FrontFace, ImageDataLayout, ImageSubresourceRange, IndexFormat, Limits, MultisampleState,
+    Origin3d, PipelineStatisticsTypes, PolygonMode, PowerPreference, PresentMode, PrimitiveState,
     PrimitiveTopology, PushConstantRange, QueryType, RenderBundleDepthStencil, SamplerBindingType,
     SamplerBorderColor, ShaderLocation, ShaderModel, ShaderStages, StencilFaceState,
     StencilOperation, StencilState, StorageTextureAccess, SurfaceConfiguration, SurfaceStatus,
@@ -217,7 +218,7 @@ trait Context: Debug + Send + Sized + Sync {
     ) -> bool;
     fn adapter_features(&self, adapter: &Self::AdapterId) -> Features;
     fn adapter_limits(&self, adapter: &Self::AdapterId) -> Limits;
-    fn adapter_downlevel_properties(&self, adapter: &Self::AdapterId) -> DownlevelCapabilities;
+    fn adapter_downlevel_capabilities(&self, adapter: &Self::AdapterId) -> DownlevelCapabilities;
     fn adapter_get_info(&self, adapter: &Self::AdapterId) -> AdapterInfo;
     fn adapter_get_texture_format_features(
         &self,
@@ -762,11 +763,13 @@ impl Drop for ShaderModule {
 pub enum ShaderSource<'a> {
     /// SPIR-V module represented as a slice of words.
     #[cfg(feature = "spirv")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "spirv")))]
     SpirV(Cow<'a, [u32]>),
     /// GLSL module as a string slice.
     ///
     /// Note: GLSL is not yet fully supported and must be a specific ShaderStage.
     #[cfg(feature = "glsl")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "glsl")))]
     Glsl {
         /// The source code of the shader.
         shader: Cow<'a, str>,
@@ -1668,8 +1671,8 @@ impl Adapter {
     }
 
     /// Get info about the adapter itself.
-    pub fn get_downlevel_properties(&self) -> DownlevelCapabilities {
-        Context::adapter_downlevel_properties(&*self.context, &self.id)
+    pub fn get_downlevel_capabilities(&self) -> DownlevelCapabilities {
+        Context::adapter_downlevel_capabilities(&*self.context, &self.id)
     }
 
     /// Returns the features supported for a given texture format by this adapter.
