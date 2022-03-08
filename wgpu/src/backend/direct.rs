@@ -1317,12 +1317,18 @@ impl crate::Context for Context {
         };
 
         let global = &self.0;
+        
+        println!("global");
+        
         let (id, error) = wgc::gfx_select!(device.id => global.device_create_render_pipeline(
             device.id,
             &descriptor,
             PhantomData,
             implicit_pipeline_ids
         ));
+        
+        println!("id, error");
+        
         if let Some(cause) = error {
             if let wgc::pipeline::CreateRenderPipelineError::Internal { stage, ref error } = cause {
                 log::warn!("Shader translation error for stage {:?}: {}", stage, error);
